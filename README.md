@@ -44,13 +44,11 @@ Le workflow suit une logique d'ETL (Extract, Transform, Load) complète :
 
 ## 3. Preuve de chargement dans PostgreSQL
 
-_Note pour toi : Modifie cette ligne ou insère ici une capture d'écran du client de base de données (ex: DBeaver, pgAdmin) montrant les 10 lignes insérées dans la table `pokemon`._
+[Preuve Image](image.png)
 
-*(Exemple de format Markdown pour image : `![Preuve DB](images/proof.png)`)*
 
-## 4. Lien du repo GitHub
+[Preuve Video](unknown_2026.03.31-12.39.mp4)
 
-[🔗 Lien vers le dépôt GitHub](https://github.com/TODO) *(Pense à mettre ton lien!)*
 
 ## 5. Requêtes SQL de contrôle
 
