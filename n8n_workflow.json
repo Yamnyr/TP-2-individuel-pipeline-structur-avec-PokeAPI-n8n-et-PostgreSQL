@@ -1,0 +1,434 @@
+{
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -208,
+        0
+      ],
+      "id": "1e9a20eb-77da-4a31-9803-6af2d483481d",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "url": "https://pokeapi.co/api/v2/pokemon?limit=10",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        496,
+        0
+      ],
+      "id": "944f59ce-31ab-4046-85f1-624e87142016",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  const data = item.json;\n\n  return {\n    json: {\n      pokemon_id: data.id || null,\n      pokemon_name: data.name || null,\n      base_experience: data.base_experience || 0,\n      height: data.height || 0,\n      weight: data.weight || 0,\n      main_type: data.types?.[0]?.type?.name || \"unknown\",\n      has_official_artwork: !!data.sprites?.other?.[\"official-artwork\"]?.front_default,\n      has_front_sprite: !!data.sprites?.front_default,\n      source_last_updated_at: new Date().toISOString(),\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1312,
+        208
+      ],
+      "id": "e5730c4d-62e7-45be-ae52-19e5c84ffc80",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO ingestion_runs (source, started_at, status)\nVALUES ('pokeapi', NOW(), 'running')\nRETURNING run_id;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        272,
+        0
+      ],
+      "id": "75bc49a4-626d-44f1-9023-346e92c80095",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "AWDpPUjV4kJ79Ky2",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "TRUNCATE TABLE pokemon, ingestion_runs RESTART IDENTITY CASCADE;\nCREATE TABLE IF NOT EXISTS ingestion_runs (\n    run_id SERIAL PRIMARY KEY,\n    source TEXT,\n    started_at TIMESTAMP,\n    finished_at TIMESTAMP,\n    status TEXT,\n    records_received INT,\n    records_inserted INT\n);\nCREATE TABLE IF NOT EXISTS pokemon (\n    id SERIAL PRIMARY KEY,\n    pokemon_id INT,\n    pokemon_name TEXT,\n    base_experience INT,\n    height INT,\n    weight INT,\n    main_type TEXT,\n    has_official_artwork BOOLEAN,\n    has_front_sprite BOOLEAN,\n    source_last_updated_at TIMESTAMP,\n    ingested_at TIMESTAMP DEFAULT NOW(),\n    run_id INT REFERENCES ingestion_runs(run_id)\n);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        48,
+        0
+      ],
+      "id": "8963f635-55c0-4bce-8cbf-cbbb96ca73f7",
+      "name": "Execute a SQL query1",
+      "credentials": {
+        "postgres": {
+          "id": "AWDpPUjV4kJ79Ky2",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        944,
+        0
+      ],
+      "id": "8e4911a6-030d-4eda-a9d0-2bb2367b168b",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "url": "=https://pokeapi.co/api/v2/pokemon/{{$json[\"name\"]}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1120,
+        208
+      ],
+      "id": "78f4ef71-7490-4263-9157-62262a4a6f58",
+      "name": "HTTP Request2"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO pokemon (\n    pokemon_id,\n    pokemon_name,\n    base_experience,\n    height,\n    weight,\n    main_type,\n    has_official_artwork,\n    has_front_sprite,\n    source_last_updated_at,\n    run_id\n)\nVALUES (\n    {{$json[\"pokemon_id\"]}},\n    '{{$json[\"pokemon_name\"]}}',\n    {{$json[\"base_experience\"]}},\n    {{$json[\"height\"]}},\n    {{$json[\"weight\"]}},\n    '{{$json[\"main_type\"]}}',\n    {{$json[\"has_official_artwork\"]}},\n    {{$json[\"has_front_sprite\"]}},\n    '{{$json[\"source_last_updated_at\"]}}',\n    {{ $('Execute a SQL query').first().json.run_id }}\n);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1504,
+        208
+      ],
+      "id": "a772acdf-19fe-42ed-89f2-04bc4bfbb76d",
+      "name": "Execute a SQL query2",
+      "credentials": {
+        "postgres": {
+          "id": "AWDpPUjV4kJ79Ky2",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1680,
+        0
+      ],
+      "id": "b59b2485-9a14-48d4-a658-79f00054b477",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE ingestion_runs\nSET\n    finished_at = NOW(),\n    status = 'success',\n    records_received = 10,\n    records_inserted = 10\nWHERE run_id = {{ $('Execute a SQL query').first().json.run_id }}\n;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1888,
+        0
+      ],
+      "id": "46f2f975-8454-447f-a7e5-590f236aa71d",
+      "name": "Execute a SQL query3",
+      "credentials": {
+        "postgres": {
+          "id": "AWDpPUjV4kJ79Ky2",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COUNT(*) FROM pokemon;\nSELECT COUNT(*) FROM pokemon WHERE has_official_artwork = false;\nSELECT COUNT(*) FROM pokemon WHERE has_front_sprite = false;\nSELECT main_type, COUNT(*) FROM pokemon GROUP BY main_type;\nSELECT * FROM pokemon WHERE pokemon_name IS NULL OR pokemon_name = '';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2096,
+        0
+      ],
+      "id": "08825316-ef3e-4598-abc3-32987de055fb",
+      "name": "Execute a SQL query4",
+      "credentials": {
+        "postgres": {
+          "id": "AWDpPUjV4kJ79Ky2",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// On prend le tableau \"results\" du premier élément et on le sépare en X éléments !\nreturn $input.first().json.results.map(pokemon => {\n  return { json: pokemon };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        0
+      ],
+      "id": "49c8b1f2-cd5d-4b89-a967-597392f98956",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n    table_name, column_name, data_type, is_nullable \nFROM information_schema.columns\nWHERE table_schema = 'public'\n  AND table_name IN ('pokemon', 'ingestion_runs')\nORDER BY table_name, ordinal_position;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2352,
+        16
+      ],
+      "id": "9b6f21db-493e-4840-b865-32f734c943ca",
+      "name": "Execute a SQL query5",
+      "credentials": {
+        "postgres": {
+          "id": "AWDpPUjV4kJ79Ky2",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COUNT(*) FROM pokemon;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2608,
+        16
+      ],
+      "id": "0b4f9f0c-24d6-40e3-9462-881ca2b2513d",
+      "name": "Execute a SQL query6",
+      "credentials": {
+        "postgres": {
+          "id": "AWDpPUjV4kJ79Ky2",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\nSELECT * FROM pokemon LIMIT 5;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2816,
+        16
+      ],
+      "id": "754641b8-417a-4555-8cba-ed3728b32f07",
+      "name": "Execute a SQL query7",
+      "credentials": {
+        "postgres": {
+          "id": "AWDpPUjV4kJ79Ky2",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query1": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request2": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query2": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query3": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query4": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query5": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query6": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a4a2b23c5069ca80271d21e4dbd58c409e60c34e2b2d91d15ef500cb27af8932"
+  }
+}
