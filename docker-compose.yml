@@ -29,5 +29,29 @@ services:
     depends_on:
       - postgres
 
+  minio:
+    image: minio/minio
+    container_name: minio_tp
+    restart: always
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+
+  metabase:
+    image: metabase/metabase:latest
+    container_name: metabase_tp
+    restart: always
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+
 volumes:
   pgdata:
+  minio_data:
